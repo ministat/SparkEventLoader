@@ -76,7 +76,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>cn.net.local.SparkEventLoader</mainClass>
+                            <mainClass>org.apache.spark.deploy.history.CarmelAppEventLoader</mainClass>
                             <classpathPrefix>dep-jars</classpathPrefix>
                         </manifest>
                     </archive>
