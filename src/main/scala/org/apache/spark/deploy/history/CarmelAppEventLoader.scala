@@ -75,6 +75,7 @@ object CarmelAppEventLoader extends Logging {
   def main(args: Array[String]): Unit = {
     val argumentsParser = new MyArgumentsParser()
     argumentsParser.doParse(args)
+    initSecurity()
     if (argumentsParser.localRun) {
       val localConf = new SparkConf
       localConf.set(EVENT_LOG_DIR, argumentsParser.inputDir)
@@ -87,7 +88,6 @@ object CarmelAppEventLoader extends Logging {
       carmelFsHistoryProvider.getListing().foreach(println(_))
       println(carmelFsHistoryProvider.getApplicationCount())
     } else {
-      initSecurity()
       val providerName = conf.getOption("spark.history.provider")
         .getOrElse(classOf[FsHistoryProvider].getName())
       val provider = Utils.classForName(providerName)
