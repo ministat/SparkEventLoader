@@ -36,8 +36,8 @@ class MyArgumentsParser{
   @ArgsOpt(name="-o", aliases=Array("--output-dir"), required=false, usage="Specify the output directory")
   var outputDir: String = null
 
-  @ArgsOpt(name="-l", aliases=Array("--local"), required=false, usage="Run under local filesystem instead of HDFS")
-  var localRun: Boolean = true
+  @ArgsOpt(name="-n", aliases=Array("--user"), required=false, usage="Specify the session owner, default is b_carmel")
+  var logOwner: String = "b_carmel"
 
   def doParse(arguments: Array[String]): Unit = {
     val parser = new CmdLineParser(this)
@@ -76,27 +76,15 @@ object CarmelAppEventLoader extends Logging {
     val argumentsParser = new MyArgumentsParser()
     argumentsParser.doParse(args)
     initSecurity()
-    if (argumentsParser.localRun) {
-      val localConf = new SparkConf
-      localConf.set(EVENT_LOG_DIR, argumentsParser.inputDir)
+    val localConf = new SparkConf
+    localConf.set(EVENT_LOG_DIR, argumentsParser.inputDir)
 
-      val carmelFsHistoryProvider = new CarmelFsHistoryProvider(localConf)
-      val simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-      val beforeDate = if (argumentsParser.beforeDate != null) simpleDateFormat.parse(argumentsParser.beforeDate) else null
-      val afterDate = if (argumentsParser.afterDate != null) simpleDateFormat.parse(argumentsParser.afterDate) else null
-      carmelFsHistoryProvider.loadAllLogs(afterDate, beforeDate)
-      carmelFsHistoryProvider.getListing().foreach(println(_))
-      println(carmelFsHistoryProvider.getApplicationCount())
-    } else {
-      val providerName = conf.getOption("spark.history.provider")
-        .getOrElse(classOf[FsHistoryProvider].getName())
-      val provider = Utils.classForName(providerName)
-        .getConstructor(classOf[SparkConf])
-        .newInstance(conf)
-        .asInstanceOf[ApplicationHistoryProvider]
-      println(provider.getListing().length)
-      provider.getListing().foreach(println(_))
-    }
-
+    val carmelFsHistoryProvider = new CarmelFsHistoryProvider(localConf)
+    val simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    val beforeDate = if (argumentsParser.beforeDate != null) simpleDateFormat.parse(argumentsParser.beforeDate) else null
+    val afterDate = if (argumentsParser.afterDate != null) simpleDateFormat.parse(argumentsParser.afterDate) else null
+    carmelFsHistoryProvider.loadAllLogs(afterDate, beforeDate, argumentsParser.logOwner)
+    carmelFsHistoryProvider.getListing().foreach(println(_))
+    println(carmelFsHistoryProvider.getApplicationCount())
   }
 }

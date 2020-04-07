@@ -250,14 +250,14 @@ private[history] class CarmelFsHistoryProvider(conf: SparkConf, clock: Clock) ex
     eventsFilter: ReplayEventsFilter = SELECT_ALL_FILTER): Unit = {
     val logPath = eventLog.getPath()
     val isCompleted = !logPath.getName().endsWith(EventLoggingListener.IN_PROGRESS)
-    logInfo(s"Replaying log path: $logPath")
+    // logInfo(s"Replaying log path: $logPath")
     tryWithResource(openEventLog(logPath, fs)) { in =>
       bus.replay(in, logPath.toString, !isCompleted, eventsFilter)
-      logInfo(s"Finished parsing $logPath")
+      // logInfo(s"Finished parsing $logPath")
     }
   }
 
-  protected def mergeApplicationListing(fileStatus: FileStatus, fs: FileSystem): Unit = {
+  protected def mergeApplicationListing(fileStatus: FileStatus, fs: FileSystem, logOwner: String): Unit = {
     val eventsFilter: ReplayEventsFilter = { eventString =>
       eventString.startsWith(APPL_START_EVENT_PREFIX) ||
         eventString.startsWith(APPL_END_EVENT_PREFIX) ||
@@ -275,11 +275,10 @@ private[history] class CarmelFsHistoryProvider(conf: SparkConf, clock: Clock) ex
       case Some(app) =>
         // Invalidate the existing UI for the reloaded app attempt, if any. See LoadedAppUI for a
         // discussion on the UI lifecycle.
-
-
-        addListing(app)
+        if (logOwner.equals(app.attempts.head.info.sparkUser)) {
+          addListing(app)
+        }
         (Some(app.info.id), app.attempts.head.info.attemptId)
-
       case _ =>
         // If the app hasn't written down its app ID to the logs, still record the entry in the
         // listing db, with an empty ID. This will make the log eligible for deletion if the app
@@ -288,7 +287,7 @@ private[history] class CarmelFsHistoryProvider(conf: SparkConf, clock: Clock) ex
     }
   }
 
-  def loadAllLogs(after: Date, before: Date): Unit = {
+  def loadAllLogs(after: Date, before: Date, logOwner: String): Unit = {
     val logDir = conf.get(EVENT_LOG_DIR)
     hadoopConf.set("fs.hdfs.impl",
       classOf[DistributedFileSystem].getName)
@@ -325,7 +324,7 @@ private[history] class CarmelFsHistoryProvider(conf: SparkConf, clock: Clock) ex
     val tasks = updated.flatMap { entry =>
       try {
         val task: Future[Unit] = replayExecutor.submit(new Runnable {
-          override def run(): Unit = mergeApplicationListing(entry, fs) //println(entry.getPath) //mergeApplicationListing(entry, newLastScanTime)
+          override def run(): Unit = mergeApplicationListing(entry, fs, logOwner)
         }, Unit)
         Some(task -> entry.getPath)
       } catch {
